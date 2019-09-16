@@ -991,8 +991,6 @@ public class DataInfo extends Keyed<DataInfo> {
         res[res.length-1] = 1;
       return res;
     }
-    
-    
 
     public String toString() {
       return this.rid + Arrays.toString(Arrays.copyOf(binIds,nBins)) + ", " + Arrays.toString(numVals);

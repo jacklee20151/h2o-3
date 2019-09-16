@@ -46,7 +46,6 @@ public final class ComputationState {
   public boolean _multinomialSpeedup = false;
   public int _totalActPred = 0; // store total number of active predictors for all classes
   public int[][] _activeColsAll; // store all active columns of all classes for multinomial classification
-  public int _MULTINOMIAL_LS_ITER = 1; // allowed multinomial iteration before line search kicks in.
 
   /**
    *
@@ -63,10 +62,7 @@ public final class ComputationState {
     _nclasses = (parms._family == Family.multinomial||parms._family == Family.ordinal)?nclasses:1;
     _alpha = _parms._alpha[0];
   }
-
-  public void set_MULTINOMIAL_LS_ITER(int iter) {
-    _MULTINOMIAL_LS_ITER=iter;
-  }
+  
   public GLMGradientSolver gslvr(){return _gslvr;}
   public double lambda(){return _lambda;}
   public void setLambdaMax(double lmax) {
@@ -657,7 +653,7 @@ public final class ComputationState {
       convergenceMsg = "betaDiff < eps; betaDiff = " + _betaDiff + ", eps = " + _parms._beta_epsilon;
       converged = true;
     }  else if (_multinomialSpeedup) {
-      if ((_relImprovement < _parms._objective_epsilon) && ((_iter > (_MULTINOMIAL_LS_ITER+1)) || (_relImprovement > 0)))  {
+      if ((_relImprovement < _parms._objective_epsilon) && (_relImprovement > 0))  {
         convergenceMsg = "relImprovement < eps; relImprovement = " + _relImprovement + ", eps = " + _parms._objective_epsilon;
         converged = true;
       }
