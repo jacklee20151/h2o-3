@@ -16,15 +16,14 @@ import hex.tree.xgboost.predict.*;
 import hex.tree.xgboost.util.PredictConfiguration;
 import ml.dmlc.xgboost4j.java.*;
 import water.*;
+import water.codegen.CodeGeneratorPipeline;
 import water.fvec.Frame;
 import water.fvec.Vec;
 import water.util.ArrayUtils;
 import water.util.Log;
+import water.util.SBPrintStream;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -194,7 +193,7 @@ public class XGBoostModel extends Model<XGBoostModel, XGBoostModel.XGBoostParame
   public void dump(String format) {
     File fmFile = null;
     try {
-      Booster b = BoosterHelper.loadModel(new ByteArrayInputStream((this).model_info._boosterBytes));
+      Booster b = BoosterHelper.loadModel(new ByteArrayInputStream(this.model_info._boosterBytes));
       fmFile = File.createTempFile("xgboost-feature-map", ".bin");
       FileOutputStream os = new FileOutputStream(fmFile);
       os.write(this.model_info._featureMap.getBytes());
@@ -613,4 +612,56 @@ public class XGBoostModel extends Model<XGBoostModel, XGBoostModel.XGBoostParame
     return treeClassIndex;
   }
 
+  //--------------------------------------------------------------------------------------------------------------------
+  // Serialization into a POJO
+  //--------------------------------------------------------------------------------------------------------------------
+
+  @Override
+  protected boolean toJavaCheckTooBig() {
+    return true;
+  }
+
+  protected SBPrintStream toJavaSuper(String modelName, SBPrintStream sb) {
+    sb.nl();
+    sb.toJavaStringInitLong("BOOSTER_BYTES", model_info._boosterBytes);
+    sb.nl();
+    sb.ip("private final biz.k11i.xgboost.Predictor predictor;").nl();
+    sb.ip("private final hex.genmodel.algos.xgboost.OneHotEncoderFactory hotFactory;").nl();
+    sb.ip("private final double[] priorClassDistrib = ").toJavaStringInit(_output._priorClassDist).p(";").nl();
+    sb.nl();
+    sb.ip("private static biz.k11i.xgboost.Predictor makePredictor(byte[] boosterBytes) {").nl();
+    sb.ip("    try (java.io.InputStream is = new java.io.ByteArrayInputStream(boosterBytes)) {").nl();
+    sb.ip("        return new biz.k11i.xgboost.Predictor(is);").nl();
+    sb.ip("    } catch (java.io.IOException e) { throw new IllegalStateException(e); }").nl();
+    sb.ip("}").nl();
+    sb.nl();
+    sb.ip("public " + modelName + "() {").nl();
+    sb.ip("    super(NAMES,DOMAINS,\"").p(_output.responseName()).p("\");");
+    sb.ip("    predictor = makePredictor(BOOSTER_BYTES);").nl();
+    sb.ip("    hotFactory = new hex.genmodel.algos.xgboost.OneHotEncoderFactory(").nl();
+    sb.p("         ").p(_output._sparse).p(", ").nl();
+    sb.p("         ").p(_output._cats).p(", ").nl();
+    sb.p("         ").p(_output._nums).p(", ").nl();
+    sb.p("         new int[] ").toJavaStringInit(_output._catOffsets).p(", ").nl();
+    sb.p("         ").p(_output._useAllFactorLevels).nl();
+    sb.ip("    );").nl();
+    sb.ip("}").nl();
+    return sb;
+  }
+
+  @Override protected SBPrintStream toJavaInit(SBPrintStream sb, CodeGeneratorPipeline fileCtx) {
+    sb.nl();
+    sb.ip("public boolean isSupervised() { return true; }").nl();
+    sb.ip("public int nclasses() { return ").p(_output.nclasses()).p("; }").nl();
+    return sb;
+  }
+
+  @Override
+  protected void toJavaPredictBody(
+      SBPrintStream body, CodeGeneratorPipeline classCtx, CodeGeneratorPipeline fileCtx, boolean verboseCode
+  ) {
+    body.ip("biz.k11i.xgboost.util.FVec row = hotFactory.fromArray(data);").nl();
+    body.ip("float[] out = predictor.predict(row);").nl();
+    body.ip("hex.genmodel.algos.xgboost.XGBoostMojoModel.toPreds(data, out, preds, nclasses(), priorClassDistrib, " + defaultThreshold() + ");").nl();
+  }
 }

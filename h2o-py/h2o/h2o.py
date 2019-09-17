@@ -982,7 +982,7 @@ def frames():
     return api("GET /3/Frames")
 
 
-def download_pojo(model, path="", get_jar=True, jar_name=""):
+def download_pojo(model, path="", get_jar=True, jar_name="", get_xgboost_jar=False):
     """
     Download the POJO for this model to the directory specified by path; if path is "", then dump to screen.
 
@@ -1010,6 +1010,11 @@ def download_pojo(model, path="", get_jar=True, jar_name=""):
                 api("GET /3/h2o-genmodel.jar", save_to=os.path.join(path, "h2o-genmodel.jar"))
             else:
                 api("GET /3/h2o-genmodel.jar", save_to=os.path.join(path, jar_name))
+        if get_xgboost_jar:
+            if jar_name == "":
+                api("GET /3/h2o-genmodel-xgboost.jar", save_to=os.path.join(path, "h2o-genmodel-xgboost.jar"))
+            else:
+                api("GET /3/h2o-genmodel-xgboost.jar", save_to=os.path.join(path, jar_name))
         return filename
 
 

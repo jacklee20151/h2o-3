@@ -263,19 +263,24 @@ def mojo_predict(model, tmpdir, mojoname, glrmReconstruct=False, get_leaf_node_a
         return newTest.frame_id, pred_mojo
 
 # perform pojo predict.  Frame containing pojo predict is returned.
-def pojo_predict(model, tmpdir, pojoname):
-    h2o.download_pojo(model, path=tmpdir)
+def pojo_predict(model, tmpdir, pojoname, get_xgboost_jar=False):
+    h2o.download_pojo(model, path=tmpdir, get_xgboost_jar=get_xgboost_jar)
     h2o_genmodel_jar = os.path.join(tmpdir, "h2o-genmodel.jar")
     java_file = os.path.join(tmpdir, pojoname + ".java")
 
     in_csv = (os.path.join(tmpdir, 'in.csv'))   # import the test dataset
+    cp_sep = ";" if sys.platform == "win32" else ":"
+    javac_cp = h2o_genmodel_jar
+    if get_xgboost_jar:
+        h2o_genmodel_xgboost_jar = os.path.join(tmpdir, "h2o-genmodel-xgboost.jar")
+        javac_cp = javac_cp + cp_sep + h2o_genmodel_xgboost_jar
     print("Compiling Java Pojo")
-    javac_cmd = ["javac", "-cp", h2o_genmodel_jar, "-J-Xmx12g", java_file]
+    javac_cmd = ["javac", "-cp", javac_cp, "-J-Xmx12g", java_file]
     subprocess.check_call(javac_cmd)
 
     out_pojo_csv = os.path.join(tmpdir, "out_pojo.csv")
-    cp_sep = ";" if sys.platform == "win32" else ":"
-    java_cmd = ["java", "-ea", "-cp", h2o_genmodel_jar + cp_sep + tmpdir, "-Xmx12g",
+    java_cp = javac_cp + cp_sep + tmpdir
+    java_cmd = ["java", "-ea", "-cp", java_cp, "-Xmx12g",
             "-XX:ReservedCodeCacheSize=256m", "hex.genmodel.tools.PredictCsv",
             "--pojo", pojoname, "--input", in_csv, "--output", out_pojo_csv, "--decimal"]
 

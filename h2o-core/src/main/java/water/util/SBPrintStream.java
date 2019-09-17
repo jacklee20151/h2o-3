@@ -208,6 +208,74 @@ public class SBPrintStream extends PrintStream implements JCodeSB<SBPrintStream>
     }
     return p('}');
   }
+  
+  private final static int METHOD_SIZE_LIMIT = 10240;
+
+  public SBPrintStream toJavaStringInitLong(String varName, byte[] ss) {
+    String decl = "private static final byte[] " + varName + " = ";
+    if (ss == null) {
+      return ip(decl).p("null;");
+    }
+    if (ss.length < METHOD_SIZE_LIMIT) {
+      return ip(decl).toJavaStringInit(ss).p(";").nl();
+    }
+    int start = 0;
+    int i = 0;
+    while (start < ss.length) {
+      ip("private static void fill_").p(varName).p("_").p(i).p("(byte[] dest) {").nl();
+      int partLength = Math.min(METHOD_SIZE_LIMIT, ss.length - start);
+      ip("    byte[] part = ").toJavaStringInit(ss, start, partLength).p(";").nl();
+      ip("    System.arraycopy(part, 0, dest, ").p(start).p(", ").p(partLength).p(");").nl();
+      ip("}").nl();
+      start += partLength;
+      i++;
+    }
+    ip(decl).p("new byte[").p(ss.length).p("];").nl();
+    ip("static {").nl();
+    for (int j = 0; j < i; j++) {
+      ip("    fill_").p(varName).p("_").p(j).p("(").p(varName).p(");").nl();
+    }
+    ip("}").nl();
+    return this;
+  }
+
+  public SBPrintStream toJavaStringInit(byte[] ss) {
+    return toJavaStringInit(ss, 0, ss.length);
+  }
+
+  public SBPrintStream toJavaStringInit(byte[] ss, int start, int length) {
+    if (ss == null) {
+      return p("null");
+    }
+    p('{');
+    for (int i = start; i < start + length - 1; i++) {
+      if ( i > 0 && i % 64 == 0) {
+        nl();
+      }
+      p(ss[i]).p(',');
+    }
+    if (length > 0) {
+      p(ss[start + length - 1]);
+    }
+    return p('}');
+  }
+
+  public SBPrintStream toJavaStringInit(int[] ss) {
+    if (ss == null) {
+      return p("null");
+    }
+    p('{');
+    for (int i = 0; i < ss.length - 1; i++) {
+      if ( i > 0 && i % 64 == 0) {
+        nl();
+      }
+      p(ss[i]).p(',');
+    }
+    if (ss.length > 0) {
+      p(ss[ss.length - 1]);
+    }
+    return p('}');
+  }
 
   public SBPrintStream toJavaStringInit(double[] ss) {
     if (ss == null) {

@@ -7,7 +7,6 @@ import biz.k11i.xgboost.learner.ObjFunction;
 import biz.k11i.xgboost.tree.RegTree;
 import biz.k11i.xgboost.tree.TreeSHAPHelper;
 import biz.k11i.xgboost.util.FVec;
-import hex.genmodel.GenModel;
 import hex.genmodel.PredictContributionsFactory;
 import hex.genmodel.algos.tree.*;
 import hex.genmodel.PredictContributions;
@@ -45,7 +44,7 @@ public final class XGBoostJavaMojoModel extends XGBoostMojoModel implements Pred
 
   @Override
   public void postReadInit() {
-    _1hotFactory = new OneHotEncoderFactory();
+    _1hotFactory = new OneHotEncoderFactory(_sparse, _cats, _nums, _catOffsets, _useAllFactorLevels);
   }
 
   private static Predictor makePredictor(byte[] boosterBytes) {
@@ -110,59 +109,6 @@ public final class XGBoostJavaMojoModel extends XGBoostMojoModel implements Pred
   public SharedTreeGraph convert(final int treeNumber, final String treeClass) {
     GradBooster booster = _predictor.getBooster();
     return _computeGraph(booster, treeNumber);
-  }
-
-  private class OneHotEncoderFactory {
-    private final int[] _catMap;
-    private final float _notHot;
-
-    OneHotEncoderFactory() {
-      _notHot = _sparse ? Float.NaN : 0;
-      if (_catOffsets == null) {
-        _catMap = new int[0];
-      } else {
-        _catMap = new int[_catOffsets[_cats]];
-        for (int c = 0; c < _cats; c++) {
-          for (int j = _catOffsets[c]; j < _catOffsets[c+1]; j++)
-            _catMap[j] = c;
-        }
-      }
-    }
-
-    OneHotEncoderFVec fromArray(double[] input) {
-      float[] numValues = new float[_nums];
-      int[] catValues = new int[_cats];
-      GenModel.setCats(input, catValues, _cats, _catOffsets, _useAllFactorLevels);
-      for (int i = 0; i < numValues.length; i++) {
-        float val = (float) input[_cats + i];
-        numValues[i] = _sparse && (val == 0) ? Float.NaN : val;
-      }
-
-      return new OneHotEncoderFVec(_catMap, catValues, numValues, _notHot);
-    }
-  }
-
-  private class OneHotEncoderFVec implements FVec {
-    private final int[] _catMap;
-    private final int[] _catValues;
-    private final float[] _numValues;
-    private final float _notHot;
-
-    private  OneHotEncoderFVec(int[] catMap, int[] catValues, float[] numValues, float notHot) {
-      _catMap = catMap;
-      _catValues = catValues;
-      _numValues = numValues;
-      _notHot = notHot;
-    }
-
-    @Override
-    public final float fvalue(int index) {
-      if (index >= _catMap.length)
-        return _numValues[index - _catMap.length];
-
-      final boolean isHot = _catValues[_catMap[index]] == index;
-      return isHot ? 1 : _notHot;
-    }
   }
 
   private final class XGBoostContributionsPredictor implements PredictContributions {
